@@ -1,42 +1,61 @@
 import type { AuthProvider, Storage, World } from '@workflow/world';
-import PgBoss from 'pg-boss';
-import createPostgres from 'postgres';
-import type { PostgresWorldConfig } from './config.js';
-import { createClient, type Drizzle } from './drizzle/index.js';
-import { createQueue } from './queue.js';
+import { createAdapter, type DatabaseAdapter } from './adapters/index.js';
+import type { DatabaseType, SqlWorldConfig } from './config.js';
+import { createQueueAdapter } from './queue/index.js';
+import { getSchema } from './schema/index.js';
 import {
   createEventsStorage,
   createHooksStorage,
   createRunsStorage,
   createStepsStorage,
 } from './storage.js';
-import { createStreamer } from './streamer.js';
+import { createStreamingAdapter } from './streaming/index.js';
 
-function createStorage(drizzle: Drizzle): Storage {
+// Re-export for backward compatibility
+export type { PostgresWorldConfig, SqlWorldConfig, DatabaseType } from './config.js';
+
+/**
+ * Detect database type from connection string
+ */
+function detectDatabaseType(connectionString: string): DatabaseType {
+  if (connectionString.startsWith('postgres://') || connectionString.startsWith('postgresql://')) {
+    return 'postgres';
+  }
+  if (connectionString.startsWith('mysql://')) {
+    return 'mysql';
+  }
+  // SQLite uses file paths or :memory:
+  return 'sqlite';
+}
+
+function createStorage(adapter: DatabaseAdapter, schema: any): Storage {
   return {
-    runs: createRunsStorage(drizzle),
-    events: createEventsStorage(drizzle),
-    hooks: createHooksStorage(drizzle),
-    steps: createStepsStorage(drizzle),
+    runs: createRunsStorage(adapter, schema),
+    events: createEventsStorage(adapter, schema),
+    hooks: createHooksStorage(adapter, schema),
+    steps: createStepsStorage(adapter, schema),
   };
 }
 
 function createAuthProvider(
-  _config: PostgresWorldConfig,
-  boss: PgBoss
+  config: SqlWorldConfig,
+  adapter: DatabaseAdapter
 ): AuthProvider {
+  const dbType = config.databaseType || detectDatabaseType(config.connectionString);
+
   return {
     async getAuthInfo() {
       return {
-        environment: 'postgres',
-        ownerId: 'postgres',
-        projectId: 'postgres',
+        environment: dbType,
+        ownerId: dbType,
+        projectId: dbType,
       };
     },
     async checkHealth() {
       try {
-        if (!(await boss.isInstalled())) {
-          throw new Error('Postgres Boss is not installed properly');
+        const isHealthy = await adapter.isHealthy();
+        if (!isHealthy) {
+          throw new Error(`${dbType} connection is not healthy`);
         }
       } catch (err) {
         return {
@@ -53,33 +72,56 @@ function createAuthProvider(
       }
       return {
         success: true,
-        message: 'Postgres connection is healthy',
+        message: `${dbType} connection is healthy`,
         data: { healthy: true },
       };
     },
   };
 }
 
-export function createWorld(
-  config: PostgresWorldConfig = {
+export async function createWorld(
+  config: SqlWorldConfig = {
+    databaseType: (process.env.WORKFLOW_SQL_DATABASE_TYPE as DatabaseType) || 'postgres',
     connectionString:
+      process.env.WORKFLOW_SQL_URL ||
       process.env.WORKFLOW_POSTGRES_URL ||
       'postgres://world:world@localhost:5432/world',
-    jobPrefix: process.env.WORKFLOW_POSTGRES_JOB_PREFIX,
+    jobPrefix: process.env.WORKFLOW_SQL_JOB_PREFIX || process.env.WORKFLOW_POSTGRES_JOB_PREFIX,
     queueConcurrency:
-      parseInt(process.env.WORKFLOW_POSTGRES_WORKER_CONCURRENCY || '10', 10) ||
-      10,
+      parseInt(
+        process.env.WORKFLOW_SQL_WORKER_CONCURRENCY ||
+        process.env.WORKFLOW_POSTGRES_WORKER_CONCURRENCY ||
+        '10',
+        10
+      ) || 10,
   }
-): World & { start(): Promise<void> } {
-  const boss = new PgBoss({
-    connectionString: config.connectionString,
+): Promise<World & { start(): Promise<void> }> {
+  // Determine database type
+  const dbType = config.databaseType || detectDatabaseType(config.connectionString);
+
+  // Get the appropriate schema
+  const schema = getSchema(dbType);
+
+  // Create database adapter
+  const adapter = await createAdapter(dbType, config.connectionString, schema);
+
+  // Connect to the database
+  await adapter.connect();
+
+  // Create queue adapter
+  const queue = await createQueueAdapter(dbType, adapter, schema, {
+    jobPrefix: config.jobPrefix,
+    queueConcurrency: config.queueConcurrency,
   });
-  const postgres = createPostgres(config.connectionString);
-  const drizzle = createClient(postgres);
-  const queue = createQueue(boss, config);
-  const storage = createStorage(drizzle);
-  const streamer = createStreamer(postgres, drizzle);
-  const auth = createAuthProvider(config, boss);
+
+  // Create storage
+  const storage = createStorage(adapter, schema);
+
+  // Create streaming adapter
+  const streamer = createStreamingAdapter(dbType, adapter, schema);
+
+  // Create auth provider
+  const auth = createAuthProvider(config, adapter);
 
   return {
     ...storage,

@@ -1,20 +1,11 @@
-/**
- * @deprecated This file is deprecated and kept for backward compatibility only.
- * Use the streaming adapters in ./streaming/ instead.
- *
- * - For PostgreSQL: use createPostgresStreaming from './streaming/postgres-streaming.js'
- * - For MySQL/SQLite: use createPollingStreaming from './streaming/polling-streaming.js'
- * - For automatic selection: use createStreamingAdapter from './streaming/index.js'
- */
-
 import { EventEmitter } from 'node:events';
-import type { Streamer } from '@workflow/world';
 import { and, eq } from 'drizzle-orm';
 import type { Sql } from 'postgres';
 import { monotonicFactory } from 'ulid';
 import * as z from 'zod';
-import { type Drizzle, Schema } from './drizzle/index.js';
-import { Mutex } from './util.js';
+import type { DatabaseAdapter } from '../adapters/index.js';
+import { Mutex } from '../util.js';
+import type { StreamingAdapter } from './base.js';
 
 const StreamPublishMessage = z.object({
   streamId: z.string(),
@@ -48,14 +39,19 @@ class Rc<T extends { drop(): void }> {
 }
 
 /**
- * @deprecated Use createStreamingAdapter from './streaming/index.js' instead
+ * PostgreSQL streaming adapter using LISTEN/NOTIFY
  */
-export function createStreamer(postgres: Sql, drizzle: Drizzle): Streamer {
+export function createPostgresStreaming(
+  adapter: DatabaseAdapter,
+  schema: any
+): StreamingAdapter {
   const ulid = monotonicFactory();
   const events = new EventEmitter<{
     [key: `strm:${string}`]: [StreamChunkEvent];
   }>();
-  const { streams } = Schema;
+  const { streams } = schema;
+  const drizzle = adapter.drizzle;
+  const postgres = adapter.client as Sql;
   const genChunkId = () => `chnk_${ulid()}` as const;
   const mutexes = new Map<string, Rc<{ drop(): void; mutex: Mutex }>>();
   const getMutex = (key: string) => {

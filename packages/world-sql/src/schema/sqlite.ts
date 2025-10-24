@@ -143,3 +143,34 @@ export const streams = sqliteTable(
     primaryKey: primaryKey({ columns: [tb.streamId, tb.chunkId] }),
   })
 );
+
+export const jobs = sqliteTable(
+  'workflow_jobs',
+  {
+    id: text('id').primaryKey(),
+    queueName: text('queue_name').notNull(),
+    payload: text('payload', { mode: 'json' }).notNull(),
+    status: text('status').notNull().$default(() => 'pending'),
+    attempts: integer('attempts').notNull().$default(() => 0),
+    maxAttempts: integer('max_attempts').notNull().$default(() => 3),
+    lockedUntil: integer('locked_until', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .$defaultFn(() => new Date())
+      .$onUpdateFn(() => new Date())
+      .notNull(),
+    scheduledFor: integer('scheduled_for', { mode: 'timestamp' })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    idempotencyKey: text('idempotency_key'),
+    error: text('error'),
+  },
+  (tb) => ({
+    queueNameIdx: index('queue_name_idx').on(tb.queueName),
+    statusIdx: index('status_idx').on(tb.status),
+    scheduledIdx: index('scheduled_idx').on(tb.scheduledFor),
+    idempotencyIdx: index('idempotency_idx').on(tb.idempotencyKey),
+  })
+);

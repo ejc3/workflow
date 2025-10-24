@@ -1,17 +1,7 @@
-/**
- * @deprecated This file is deprecated and kept for backward compatibility only.
- * Use the queue adapters in ./queue/ instead.
- *
- * - For PostgreSQL: use createPgBossQueue from './queue/pg-boss-queue.js'
- * - For MySQL/SQLite: use createTableQueue from './queue/table-queue.js'
- * - For automatic selection: use createQueueAdapter from './queue/index.js'
- */
-
 import * as Stream from 'node:stream';
 import { JsonTransport } from '@vercel/queue';
 import {
   MessageId,
-  type Queue,
   QueuePayloadSchema,
   type QueuePrefix,
   type ValidQueueName,
@@ -19,25 +9,16 @@ import {
 import { createEmbeddedWorld } from '@workflow/world-local';
 import type PgBoss from 'pg-boss';
 import { monotonicFactory } from 'ulid';
-import { MessageData } from './boss.js';
-import type { PostgresWorldConfig } from './config.js';
+import { MessageData } from '../boss.js';
+import type { QueueAdapter, QueueAdapterConfig } from './base.js';
 
 /**
- * @deprecated Use createQueueAdapter from './queue/index.js' instead
- *
- * The Postgres queue works by creating two job types in pg-boss:
- * - `workflow` for workflow jobs
- *   - `step` for step jobs
- *
- * When a message is queued, it is sent to pg-boss with the appropriate job type.
- * When a job is processed, it is deserialized and then re-queued into the _embedded world_, showing that
- * we can reuse the embedded world, mix and match worlds to build
- * hybrid architectures, and even migrate between worlds.
+ * PostgreSQL queue adapter using pg-boss
  */
-export function createQueue(
+export function createPgBossQueue(
   boss: PgBoss,
-  config: PostgresWorldConfig
-): Queue & { start(): Promise<void> } {
+  config: QueueAdapterConfig
+): QueueAdapter {
   const port = process.env.PORT ? Number(process.env.PORT) : undefined;
   const embeddedWorld = createEmbeddedWorld({ dataDir: undefined, port });
 
@@ -52,8 +33,8 @@ export function createQueue(
 
   const createQueueHandler = embeddedWorld.createQueueHandler;
 
-  const getDeploymentId: Queue['getDeploymentId'] = async () => {
-    return 'postgres';
+  const getDeploymentId = async () => {
+    return 'sql';
   };
 
   const createdQueues = new Map<string, Promise<void>>();
@@ -67,7 +48,7 @@ export function createQueue(
     return createdQueue;
   }
 
-  const queue: Queue['queue'] = async (queue, message, opts) => {
+  const queue: QueueAdapter['queue'] = async (queue, message, opts) => {
     await boss.start();
     const [prefix, queueId] = parseQueueName(queue);
     const jobName = Queues[prefix];
@@ -129,8 +110,11 @@ export function createQueue(
     getDeploymentId,
     queue,
     async start() {
-      boss = await boss.start();
+      await boss.start();
       await setupListeners();
+    },
+    async stop() {
+      await boss.stop();
     },
   };
 }

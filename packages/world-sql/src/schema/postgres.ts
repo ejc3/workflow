@@ -154,3 +154,30 @@ export const streams = pgTable(
     primaryKey: primaryKey({ columns: [tb.streamId, tb.chunkId] }),
   })
 );
+
+export const jobs = pgTable(
+  'workflow_jobs',
+  {
+    id: varchar('id').primaryKey(),
+    queueName: varchar('queue_name').notNull(),
+    payload: jsonb('payload').notNull(),
+    status: varchar('status').notNull().$default(() => 'pending'),
+    attempts: integer('attempts').notNull().$default(() => 0),
+    maxAttempts: integer('max_attempts').notNull().$default(() => 3),
+    lockedUntil: timestamp('locked_until'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdateFn(() => new Date())
+      .notNull(),
+    scheduledFor: timestamp('scheduled_for').defaultNow().notNull(),
+    idempotencyKey: varchar('idempotency_key'),
+    error: text('error'),
+  },
+  (tb) => ({
+    queueNameIdx: index().on(tb.queueName),
+    statusIdx: index().on(tb.status),
+    scheduledIdx: index().on(tb.scheduledFor),
+    idempotencyIdx: index().on(tb.idempotencyKey),
+  })
+);

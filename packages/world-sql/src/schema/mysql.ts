@@ -140,3 +140,32 @@ export const streams = mysqlTable(
     primaryKey: primaryKey({ columns: [tb.streamId, tb.chunkId] }),
   })
 );
+
+export const jobs = mysqlTable(
+  'workflow_jobs',
+  {
+    id: varchar('id', { length: 255 }).primaryKey(),
+    queueName: varchar('queue_name', { length: 255 }).notNull(),
+    payload: json('payload').notNull(),
+    status: varchar('status', { length: 50 })
+      .notNull()
+      .$default(() => 'pending'),
+    attempts: int('attempts').notNull().$default(() => 0),
+    maxAttempts: int('max_attempts').notNull().$default(() => 3),
+    lockedUntil: timestamp('locked_until'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdateFn(() => new Date())
+      .notNull(),
+    scheduledFor: timestamp('scheduled_for').defaultNow().notNull(),
+    idempotencyKey: varchar('idempotency_key', { length: 255 }),
+    error: text('error'),
+  },
+  (tb) => ({
+    queueNameIdx: index('queue_name_idx').on(tb.queueName),
+    statusIdx: index('status_idx').on(tb.status),
+    scheduledIdx: index('scheduled_idx').on(tb.scheduledFor),
+    idempotencyIdx: index('idempotency_idx').on(tb.idempotencyKey),
+  })
+);

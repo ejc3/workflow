@@ -40,10 +40,10 @@
     "zod": "catalog:"
   },
   "peerDependencies": {
-    "postgres": "^3.4.7",
-    "pg-boss": "^11.0.7",
+    "better-sqlite3": "^11.0.0",
     "mysql2": "^3.0.0",
-    "better-sqlite3": "^11.0.0"
+    "pg-boss": "^11.0.7",
+    "postgres": "^3.4.7"
   },
   "peerDependenciesMeta": {
     "postgres": {
@@ -60,6 +60,7 @@
     }
   },
   "devDependencies": {
+    "@testcontainers/mysql": "^11.7.2",
     "@testcontainers/postgresql": "^11.7.1",
     "@types/better-sqlite3": "^7.6.11",
     "@types/node": "catalog:",

@@ -22,8 +22,8 @@ export class MySQLAdapter
     connectionString: string,
     schema?: Record<string, any>
   ): Promise<MySQLAdapter> {
-    const mysql2 = require('mysql2/promise');
-    const client = await mysql2.createConnection(connectionString);
+    const mysql2 = await import('mysql2/promise');
+    const client = await mysql2.default.createConnection(connectionString);
     return new MySQLAdapter(client, schema);
   }
 

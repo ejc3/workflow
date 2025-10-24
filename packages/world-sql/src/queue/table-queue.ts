@@ -148,7 +148,8 @@ export function createTableQueue(
         .where(eq(jobs.id, job.id));
     } catch (error) {
       // Handle job failure
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
 
       if (job.attempts + 1 >= job.maxAttempts) {
         // Max attempts reached, mark as failed
@@ -211,7 +212,7 @@ export function createTableQueue(
   }
 
   async function setupListeners() {
-    for (const [prefix, jobName] of Object.entries(Queues) as [
+    for (const [_prefix, jobName] of Object.entries(Queues) as [
       QueuePrefix,
       string,
     ][]) {

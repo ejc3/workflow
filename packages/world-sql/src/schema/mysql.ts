@@ -2,11 +2,10 @@ import {
   type Event,
   type Hook,
   type Step,
-  StepStatusSchema,
   type WorkflowRun,
-  WorkflowRunStatusSchema,
 } from '@workflow/world';
 import {
+  binary,
   boolean,
   index,
   int,
@@ -16,7 +15,6 @@ import {
   text,
   timestamp,
   varchar,
-  blob,
 } from 'drizzle-orm/mysql-core';
 
 /**
@@ -40,10 +38,7 @@ export const runs = mysqlTable(
     runId: varchar('id', { length: 255 }).primaryKey(),
     output: json('output').$type<SerializedContent>(),
     deploymentId: varchar('deployment_id', { length: 255 }).notNull(),
-    status: varchar('status', {
-      length: 50,
-      enum: WorkflowRunStatusSchema.options,
-    }).notNull(),
+    status: varchar('status', { length: 50 }).notNull(),
     workflowName: varchar('name', { length: 255 }).notNull(),
     executionContext: json('execution_context').$type<Record<string, any>>(),
     input: json('input').$type<SerializedContent>().notNull(),
@@ -87,7 +82,7 @@ export const steps = mysqlTable(
     runId: varchar('run_id', { length: 255 }).notNull(),
     stepId: varchar('step_id', { length: 255 }).primaryKey(),
     stepName: varchar('step_name', { length: 255 }).notNull(),
-    status: varchar('status', { length: 50, enum: StepStatusSchema.options }).notNull(),
+    status: varchar('status', { length: 50 }).notNull(),
     input: json('input').$type<SerializedContent>().notNull(),
     output: json('output').$type<SerializedContent>(),
     error: text('error'),
@@ -128,11 +123,9 @@ export const hooks = mysqlTable(
 export const streams = mysqlTable(
   'workflow_stream_chunks',
   {
-    chunkId: varchar('id', { length: 255 })
-      .$type<`chnk_${string}`>()
-      .notNull(),
+    chunkId: varchar('id', { length: 255 }).$type<`chnk_${string}`>().notNull(),
     streamId: varchar('stream_id', { length: 255 }).notNull(),
-    chunkData: blob('data').notNull(),
+    chunkData: binary('data').notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     eof: boolean('eof').notNull(),
   },
@@ -150,8 +143,12 @@ export const jobs = mysqlTable(
     status: varchar('status', { length: 50 })
       .notNull()
       .$default(() => 'pending'),
-    attempts: int('attempts').notNull().$default(() => 0),
-    maxAttempts: int('max_attempts').notNull().$default(() => 3),
+    attempts: int('attempts')
+      .notNull()
+      .$default(() => 0),
+    maxAttempts: int('max_attempts')
+      .notNull()
+      .$default(() => 3),
     lockedUntil: timestamp('locked_until'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')

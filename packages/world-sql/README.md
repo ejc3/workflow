@@ -4,6 +4,34 @@ An embedded worker/workflow system supporting **PostgreSQL**, **MySQL**, and **S
 
 > **Note**: This package was formerly known as `@workflow/world-postgres` and has been refactored to support multiple SQL databases.
 
+## Quick Start
+
+**Want to try it out right now?**
+
+1. **Read the [Getting Started Guide](./GETTING_STARTED.md)** - Step-by-step instructions for starting MySQL, PostgreSQL, or SQLite
+2. **Run the example script** - See a working demo in action:
+
+   ```bash
+   # Build the package first
+   pnpm build
+
+   # Try with SQLite (no container needed)
+   node scripts/setup-sqlite.js
+   node example.js sqlite
+
+   # Or try with MySQL (container required)
+   docker run -d --name workflow-mysql \
+     -e MYSQL_ROOT_PASSWORD=workflow \
+     -e MYSQL_DATABASE=workflow \
+     -e MYSQL_USER=workflow \
+     -e MYSQL_PASSWORD=workflow \
+     -p 3306:3306 mysql:8
+   node scripts/setup-mysql.js
+   node example.js mysql
+   ```
+
+3. **Read the [Testing Guide](./TESTING.md)** - Learn how to run the comprehensive test suite
+
 ## Installation
 
 ```bash

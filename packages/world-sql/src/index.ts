@@ -12,13 +12,20 @@ import {
 import { createStreamingAdapter } from './streaming/index.js';
 
 // Re-export for backward compatibility
-export type { PostgresWorldConfig, SqlWorldConfig, DatabaseType } from './config.js';
+export type {
+  PostgresWorldConfig,
+  SqlWorldConfig,
+  DatabaseType,
+} from './config.js';
 
 /**
  * Detect database type from connection string
  */
 function detectDatabaseType(connectionString: string): DatabaseType {
-  if (connectionString.startsWith('postgres://') || connectionString.startsWith('postgresql://')) {
+  if (
+    connectionString.startsWith('postgres://') ||
+    connectionString.startsWith('postgresql://')
+  ) {
     return 'postgres';
   }
   if (connectionString.startsWith('mysql://')) {
@@ -28,12 +35,16 @@ function detectDatabaseType(connectionString: string): DatabaseType {
   return 'sqlite';
 }
 
-function createStorage(adapter: DatabaseAdapter, schema: any): Storage {
+function createStorage(
+  adapter: DatabaseAdapter,
+  schema: any,
+  dbType: DatabaseType
+): Storage {
   return {
-    runs: createRunsStorage(adapter, schema),
+    runs: createRunsStorage(adapter, schema, dbType),
     events: createEventsStorage(adapter, schema),
     hooks: createHooksStorage(adapter, schema),
-    steps: createStepsStorage(adapter, schema),
+    steps: createStepsStorage(adapter, schema, dbType),
   };
 }
 
@@ -41,7 +52,8 @@ function createAuthProvider(
   config: SqlWorldConfig,
   adapter: DatabaseAdapter
 ): AuthProvider {
-  const dbType = config.databaseType || detectDatabaseType(config.connectionString);
+  const dbType =
+    config.databaseType || detectDatabaseType(config.connectionString);
 
   return {
     async getAuthInfo() {
@@ -81,23 +93,27 @@ function createAuthProvider(
 
 export async function createWorld(
   config: SqlWorldConfig = {
-    databaseType: (process.env.WORKFLOW_SQL_DATABASE_TYPE as DatabaseType) || 'postgres',
+    databaseType:
+      (process.env.WORKFLOW_SQL_DATABASE_TYPE as DatabaseType) || 'postgres',
     connectionString:
       process.env.WORKFLOW_SQL_URL ||
       process.env.WORKFLOW_POSTGRES_URL ||
       'postgres://world:world@localhost:5432/world',
-    jobPrefix: process.env.WORKFLOW_SQL_JOB_PREFIX || process.env.WORKFLOW_POSTGRES_JOB_PREFIX,
+    jobPrefix:
+      process.env.WORKFLOW_SQL_JOB_PREFIX ||
+      process.env.WORKFLOW_POSTGRES_JOB_PREFIX,
     queueConcurrency:
       parseInt(
         process.env.WORKFLOW_SQL_WORKER_CONCURRENCY ||
-        process.env.WORKFLOW_POSTGRES_WORKER_CONCURRENCY ||
-        '10',
+          process.env.WORKFLOW_POSTGRES_WORKER_CONCURRENCY ||
+          '10',
         10
       ) || 10,
   }
 ): Promise<World & { start(): Promise<void> }> {
   // Determine database type
-  const dbType = config.databaseType || detectDatabaseType(config.connectionString);
+  const dbType =
+    config.databaseType || detectDatabaseType(config.connectionString);
 
   // Get the appropriate schema
   const schema = getSchema(dbType);
@@ -115,7 +131,7 @@ export async function createWorld(
   });
 
   // Create storage
-  const storage = createStorage(adapter, schema);
+  const storage = createStorage(adapter, schema, dbType);
 
   // Create streaming adapter
   const streamer = createStreamingAdapter(dbType, adapter, schema);

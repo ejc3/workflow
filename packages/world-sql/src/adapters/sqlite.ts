@@ -13,10 +13,21 @@ export class SQLiteAdapter
   client: BetterSqlite3.Database;
   drizzle: BetterSQLite3Database<any>;
 
-  constructor(connectionString: string, schema?: Record<string, any>) {
-    const Database = require('better-sqlite3');
-    this.client = new Database(connectionString);
-    this.drizzle = drizzleSqlite(this.client, { schema });
+  private constructor(
+    client: BetterSqlite3.Database,
+    schema?: Record<string, any>
+  ) {
+    this.client = client;
+    this.drizzle = drizzleSqlite(client, { schema });
+  }
+
+  static async create(
+    connectionString: string,
+    schema?: Record<string, any>
+  ): Promise<SQLiteAdapter> {
+    const Database = await import('better-sqlite3');
+    const client = new Database.default(connectionString);
+    return new SQLiteAdapter(client, schema);
   }
 
   async connect(): Promise<void> {
@@ -45,7 +56,7 @@ export async function createSQLiteAdapter(
   connectionString: string,
   schema?: Record<string, any>
 ): Promise<SQLiteAdapter> {
-  const adapter = new SQLiteAdapter(connectionString, schema);
+  const adapter = await SQLiteAdapter.create(connectionString, schema);
   await adapter.connect();
   return adapter;
 }

@@ -13,11 +13,18 @@ export class PostgresAdapter
   client: Postgres.Sql;
   drizzle: PostgresJsDatabase<any>;
 
-  constructor(connectionString: string, schema?: Record<string, any>) {
-    // Dynamic import is handled by the factory
-    const postgres = require('postgres');
-    this.client = postgres(connectionString);
-    this.drizzle = drizzlePg(this.client, { schema });
+  private constructor(client: Postgres.Sql, schema?: Record<string, any>) {
+    this.client = client;
+    this.drizzle = drizzlePg(client, { schema });
+  }
+
+  static async create(
+    connectionString: string,
+    schema?: Record<string, any>
+  ): Promise<PostgresAdapter> {
+    const postgres = await import('postgres');
+    const client = postgres.default(connectionString);
+    return new PostgresAdapter(client, schema);
   }
 
   async connect(): Promise<void> {
@@ -46,5 +53,5 @@ export async function createPostgresAdapter(
   connectionString: string,
   schema?: Record<string, any>
 ): Promise<PostgresAdapter> {
-  return new PostgresAdapter(connectionString, schema);
+  return PostgresAdapter.create(connectionString, schema);
 }

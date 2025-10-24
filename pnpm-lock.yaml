@@ -721,6 +721,9 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11
     devDependencies:
+      '@testcontainers/mysql':
+        specifier: ^11.7.2
+        version: 11.7.2
       '@testcontainers/postgresql':
         specifier: ^11.7.1
         version: 11.7.1
@@ -4295,6 +4298,9 @@ packages:
 
   '@tailwindcss/postcss@4.1.13':
     resolution: {integrity: sha512-HLgx6YSFKJT7rJqh9oJs/TkBFhxuMOfUKSBEPYwV+t78POOBsdQ7crhZLzwcH3T0UyUuOzU/GK5pk5eKr3wCiQ==}
+
+  '@testcontainers/mysql@11.7.2':
+    resolution: {integrity: sha512-zKXpEC8dsBeqx+r8UcZR0bkS1OEz3CpT2cTaaJ1bVf9bWgBtDjcgJorXxUgSgpcy4Jd4bRfZNU3fhpnj2lZn5Q==}
 
   '@testcontainers/postgresql@11.7.1':
     resolution: {integrity: sha512-8PfGNqwdyoMPQuubZM0wd07/tfi4vhLAjXP791tM105vSCmzCOhLfYu2CIq04GKVlmW1J5z5nOZWLNlU9WrUuQ==}
@@ -8387,6 +8393,9 @@ packages:
 
   testcontainers@11.7.1:
     resolution: {integrity: sha512-fjut+07G4Avp6Lly/6hQePpUpQFv9ZyQd+7JC5iCDKg+dWa2Sw7fXD3pBrkzslYFfKqGx9M6kyIaLpg9VeMsjw==}
+
+  testcontainers@11.7.2:
+    resolution: {integrity: sha512-jeFzeyzLhIouRAbLnQNapJ2esBs/mvXkkYvO1/vSZehT3/7+Q557qaNxwKwMqAbfxfSh7gcx1OLlMsQUZ9JLdA==}
 
   text-decoder@1.2.3:
     resolution: {integrity: sha512-3/o9z3X0X0fTupwsYvR03pJ/DjWuqqrfwBgTQzdWDiQSm9KitAyz/9WqsT2JQW7KV2m+bC2ol/zqpW37NHxLaA==}
@@ -12771,6 +12780,15 @@ snapshots:
       '@tailwindcss/oxide': 4.1.13
       postcss: 8.5.6
       tailwindcss: 4.1.13
+
+  '@testcontainers/mysql@11.7.2':
+    dependencies:
+      testcontainers: 11.7.2
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
 
   '@testcontainers/postgresql@11.7.1':
     dependencies:
@@ -17671,6 +17689,29 @@ snapshots:
       minimatch: 9.0.5
 
   testcontainers@11.7.1:
+    dependencies:
+      '@balena/dockerignore': 1.0.2
+      '@types/dockerode': 3.3.44
+      archiver: 7.0.1
+      async-lock: 1.4.1
+      byline: 5.0.0
+      debug: 4.4.3(supports-color@8.1.1)
+      docker-compose: 1.3.0
+      dockerode: 4.0.9
+      get-port: 7.1.0
+      proper-lockfile: 4.1.2
+      properties-reader: 2.3.0
+      ssh-remote-port-forward: 1.0.4
+      tar-fs: 3.1.1
+      tmp: 0.2.5
+      undici: 7.16.0
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
+  testcontainers@11.7.2:
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@types/dockerode': 3.3.44

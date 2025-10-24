@@ -6,7 +6,7 @@ import type {
   PaginatedResponse,
   Storage,
 } from '@workflow/world';
-import { and, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, type SQL } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
 import type { DatabaseAdapter } from './adapters/index.js';
 import type { DatabaseType } from './config.js';
@@ -14,14 +14,49 @@ import { compact } from './util.js';
 
 export type SerializedContent = any[];
 
+/**
+ * Helper to update a row and return the updated value
+ * MySQL doesn't support RETURNING, so we need to SELECT after UPDATE
+ *
+ * For MySQL, we need to SELECT using the primary key, not the original WHERE clause,
+ * because the WHERE clause might include conditions on fields that were just updated.
+ */
+async function updateAndReturn<T>(
+  dbType: DatabaseType,
+  drizzle: any,
+  table: any,
+  updates: Record<string, any>,
+  where: SQL | undefined,
+  primaryKeyColumn?: any,
+  primaryKeyValue?: string
+): Promise<T[]> {
+  if (dbType === 'mysql') {
+    if (!primaryKeyColumn || !primaryKeyValue) {
+      throw new Error(
+        'MySQL requires primaryKeyColumn and primaryKeyValue for updateAndReturn'
+      );
+    }
+    // Execute the update with the original WHERE clause
+    await drizzle.update(table).set(updates).where(where);
+    // SELECT using the primary key to get the updated row
+    return drizzle
+      .select()
+      .from(table)
+      .where(eq(primaryKeyColumn, primaryKeyValue))
+      .limit(1);
+  } else {
+    return drizzle.update(table).set(updates).where(where).returning();
+  }
+}
+
 export function createRunsStorage(
   adapter: DatabaseAdapter,
-  schema: any
+  schema: any,
+  dbType: DatabaseType
 ): Storage['runs'] {
   const ulid = monotonicFactory();
   const { runs } = schema;
   const drizzle = adapter.drizzle;
-  const dbType = adapter.type;
 
   return {
     async get(id) {
@@ -33,44 +68,56 @@ export function createRunsStorage(
       if (!value) {
         throw new WorkflowAPIError(`Run not found: ${id}`, { status: 404 });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async cancel(id) {
       // TODO: we might want to guard this for only specific statuses
-      const [value] = await drizzle
-        .update(runs)
-        .set({ status: 'cancelled', completedAt: new Date() })
-        .where(eq(runs.runId, id))
-        .returning();
+      const [value] = await updateAndReturn(
+        dbType,
+        drizzle,
+        runs,
+        { status: 'cancelled', completedAt: new Date() },
+        eq(runs.runId, id),
+        runs.runId,
+        id
+      );
       if (!value) {
         throw new WorkflowAPIError(`Run not found: ${id}`, { status: 404 });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async pause(id) {
       // TODO: we might want to guard this for only specific statuses
-      const [value] = await drizzle
-        .update(runs)
-        .set({ status: 'paused' })
-        .where(eq(runs.runId, id))
-        .returning();
+      const [value] = await updateAndReturn(
+        dbType,
+        drizzle,
+        runs,
+        { status: 'paused' },
+        eq(runs.runId, id),
+        runs.runId,
+        id
+      );
       if (!value) {
         throw new WorkflowAPIError(`Run not found: ${id}`, { status: 404 });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async resume(id) {
-      const [value] = await drizzle
-        .update(runs)
-        .set({ status: 'running' })
-        .where(and(eq(runs.runId, id), eq(runs.status, 'paused')))
-        .returning();
+      const [value] = await updateAndReturn(
+        dbType,
+        drizzle,
+        runs,
+        { status: 'running' },
+        and(eq(runs.runId, id), eq(runs.status, 'paused')),
+        runs.runId,
+        id
+      );
       if (!value) {
         throw new WorkflowAPIError(`Paused run not found: ${id}`, {
           status: 404,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async list(params) {
       const limit = params?.pagination?.limit ?? 20;
@@ -99,9 +146,23 @@ export function createRunsStorage(
     },
     async create(data) {
       const runId = `wrun_${ulid()}`;
-      const [value] = await drizzle
-        .insert(runs)
-        .values({
+      // Database-specific conflict handling
+      if (dbType === 'mysql') {
+        // MySQL: Check if run exists first
+        const [existing] = await drizzle
+          .select()
+          .from(runs)
+          .where(eq(runs.runId, runId))
+          .limit(1);
+
+        if (existing) {
+          throw new WorkflowAPIError(`Run ${runId} already exists`, {
+            status: 409,
+          });
+        }
+
+        // Insert the new run (MySQL doesn't support RETURNING)
+        await drizzle.insert(runs).values({
           runId,
           input: data.input,
           executionContext: data.executionContext as Record<
@@ -111,15 +172,41 @@ export function createRunsStorage(
           deploymentId: data.deploymentId,
           status: 'pending',
           workflowName: data.workflowName,
-        })
-        .onConflictDoNothing()
-        .returning();
-      if (!value) {
-        throw new WorkflowAPIError(`Run ${runId} already exists`, {
-          status: 409,
         });
+
+        // Fetch the newly created run
+        const [value] = await drizzle
+          .select()
+          .from(runs)
+          .where(eq(runs.runId, runId))
+          .limit(1);
+
+        return compact(value) as any;
+      } else {
+        // PostgreSQL/SQLite: Use onConflictDoNothing
+        const [value] = await drizzle
+          .insert(runs)
+          .values({
+            runId,
+            input: data.input,
+            executionContext: data.executionContext as Record<
+              string,
+              unknown
+            > | null,
+            deploymentId: data.deploymentId,
+            status: 'pending',
+            workflowName: data.workflowName,
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (!value) {
+          throw new WorkflowAPIError(`Run ${runId} already exists`, {
+            status: 409,
+          });
+        }
+        return compact(value) as any;
       }
-      return compact(value);
     },
     async update(id, data) {
       // Fetch current run to check if startedAt is already set
@@ -150,15 +237,19 @@ export function createRunsStorage(
         updates.completedAt = new Date();
       }
 
-      const [value] = await drizzle
-        .update(runs)
-        .set(updates)
-        .where(eq(runs.runId, id))
-        .returning();
+      const [value] = await updateAndReturn(
+        dbType,
+        drizzle,
+        runs,
+        updates,
+        eq(runs.runId, id),
+        runs.runId,
+        id
+      );
       if (!value) {
         throw new WorkflowAPIError(`Run not found: ${id}`, { status: 404 });
       }
-      return compact(value);
+      return compact(value) as any;
     },
   };
 }
@@ -270,7 +361,7 @@ export function createHooksStorage(
         .from(hooks)
         .where(eq(hooks.hookId, hookId))
         .limit(1);
-      return compact(value);
+      return compact(value) as any;
     },
     async create(runId, data) {
       const [value] = await drizzle
@@ -290,7 +381,7 @@ export function createHooksStorage(
           status: 409,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async getByToken(token) {
       const [value] = await drizzle
@@ -303,7 +394,7 @@ export function createHooksStorage(
           status: 404,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async list(params: ListHooksParams) {
       const limit = params?.pagination?.limit ?? 100;
@@ -337,38 +428,75 @@ export function createHooksStorage(
           status: 404,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
   };
 }
 
 export function createStepsStorage(
   adapter: DatabaseAdapter,
-  schema: any
+  schema: any,
+  dbType: DatabaseType
 ): Storage['steps'] {
   const { steps } = schema;
   const drizzle = adapter.drizzle;
 
   return {
     async create(runId, data) {
-      const [value] = await drizzle
-        .insert(steps)
-        .values({
+      if (dbType === 'mysql') {
+        // MySQL: Check if step exists first
+        const [existing] = await drizzle
+          .select()
+          .from(steps)
+          .where(eq(steps.stepId, data.stepId))
+          .limit(1);
+
+        if (existing) {
+          throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
+            status: 409,
+          });
+        }
+
+        // Insert the step
+        await drizzle.insert(steps).values({
           runId,
           stepId: data.stepId,
           stepName: data.stepName,
           input: data.input as SerializedContent,
           status: 'pending',
           attempt: 1,
-        })
-        .onConflictDoNothing()
-        .returning();
-      if (!value) {
-        throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
-          status: 409,
         });
+
+        // Fetch the newly created step
+        const [value] = await drizzle
+          .select()
+          .from(steps)
+          .where(eq(steps.stepId, data.stepId))
+          .limit(1);
+
+        return compact(value) as any;
+      } else {
+        // PostgreSQL/SQLite: Use onConflictDoNothing
+        const [value] = await drizzle
+          .insert(steps)
+          .values({
+            runId,
+            stepId: data.stepId,
+            stepName: data.stepName,
+            input: data.input as SerializedContent,
+            status: 'pending',
+            attempt: 1,
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (!value) {
+          throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
+            status: 409,
+          });
+        }
+        return compact(value) as any;
       }
-      return compact(value);
     },
     async get(runId, stepId) {
       const [value] = await drizzle
@@ -381,7 +509,7 @@ export function createStepsStorage(
           status: 404,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async update(runId, stepId, data) {
       // Fetch current step to check if startedAt is already set
@@ -409,17 +537,21 @@ export function createStepsStorage(
       if (data.status === 'completed' || data.status === 'failed') {
         updates.completedAt = now;
       }
-      const [value] = await drizzle
-        .update(steps)
-        .set(updates)
-        .where(and(eq(steps.stepId, stepId), eq(steps.runId, runId)))
-        .returning();
+      const [value] = await updateAndReturn(
+        dbType,
+        drizzle,
+        steps,
+        updates,
+        and(eq(steps.stepId, stepId), eq(steps.runId, runId)),
+        steps.stepId,
+        stepId
+      );
       if (!value) {
         throw new WorkflowAPIError(`Step not found: ${stepId}`, {
           status: 404,
         });
       }
-      return compact(value);
+      return compact(value) as any;
     },
     async list(params) {
       const limit = params?.pagination?.limit ?? 20;

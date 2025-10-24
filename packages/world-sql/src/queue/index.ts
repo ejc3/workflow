@@ -3,22 +3,21 @@ import type { DatabaseAdapter } from '../adapters/index.js';
 import type { QueueAdapter, QueueAdapterConfig } from './base.js';
 import { createPgBossQueue } from './pg-boss-queue.js';
 import { createTableQueue } from './table-queue.js';
+import PgBoss from 'pg-boss';
 
 export type { QueueAdapter, QueueAdapterConfig } from './base.js';
 
 /**
  * Create a queue adapter based on the database type
  */
-export async function createQueueAdapter(
+export function createQueueAdapter(
   databaseType: DatabaseType,
   adapter: DatabaseAdapter,
   schema: any,
   config: QueueAdapterConfig
-): Promise<QueueAdapter> {
+): QueueAdapter {
   switch (databaseType) {
     case 'postgres': {
-      // Dynamically import pg-boss for PostgreSQL
-      const PgBoss = (await import('pg-boss')).default;
       const connectionString =
         (adapter.client as any).options?.connection || '';
       const boss = new PgBoss({ connectionString });

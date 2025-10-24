@@ -91,7 +91,7 @@ function createAuthProvider(
   };
 }
 
-export async function createWorld(
+export function createWorld(
   config: SqlWorldConfig = {
     databaseType:
       (process.env.WORKFLOW_SQL_DATABASE_TYPE as DatabaseType) || 'postgres',
@@ -110,7 +110,7 @@ export async function createWorld(
         10
       ) || 10,
   }
-): Promise<World & { start(): Promise<void> }> {
+): World & { start(): Promise<void> } {
   // Determine database type
   const dbType =
     config.databaseType || detectDatabaseType(config.connectionString);
@@ -118,14 +118,11 @@ export async function createWorld(
   // Get the appropriate schema
   const schema = getSchema(dbType);
 
-  // Create database adapter
-  const adapter = await createAdapter(dbType, config.connectionString, schema);
+  // Create database adapter (synchronous, lazy connection)
+  const adapter = createAdapter(dbType, config.connectionString, schema);
 
-  // Connect to the database
-  await adapter.connect();
-
-  // Create queue adapter
-  const queue = await createQueueAdapter(dbType, adapter, schema, {
+  // Create queue adapter (synchronous)
+  const queue = createQueueAdapter(dbType, adapter, schema, {
     jobPrefix: config.jobPrefix,
     queueConcurrency: config.queueConcurrency,
   });
@@ -145,6 +142,9 @@ export async function createWorld(
     ...auth,
     ...queue,
     async start() {
+      // Connect to database first
+      await adapter.connect();
+      // Then start queue worker
       await queue.start();
     },
   };

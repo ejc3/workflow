@@ -1,5 +1,6 @@
 import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import type Postgres from 'postgres';
 import type { DatabaseAdapter } from './base.js';
 
@@ -13,18 +14,9 @@ export class PostgresAdapter
   client: Postgres.Sql;
   drizzle: PostgresJsDatabase<any>;
 
-  private constructor(client: Postgres.Sql, schema?: Record<string, any>) {
-    this.client = client;
-    this.drizzle = drizzlePg(client, { schema });
-  }
-
-  static async create(
-    connectionString: string,
-    schema?: Record<string, any>
-  ): Promise<PostgresAdapter> {
-    const postgres = await import('postgres');
-    const client = postgres.default(connectionString);
-    return new PostgresAdapter(client, schema);
+  constructor(connectionString: string, schema?: Record<string, any>) {
+    this.client = postgres(connectionString);
+    this.drizzle = drizzlePg(this.client, { schema });
   }
 
   async connect(): Promise<void> {
@@ -49,9 +41,9 @@ export class PostgresAdapter
 /**
  * Create a PostgreSQL adapter
  */
-export async function createPostgresAdapter(
+export function createPostgresAdapter(
   connectionString: string,
   schema?: Record<string, any>
-): Promise<PostgresAdapter> {
-  return PostgresAdapter.create(connectionString, schema);
+): PostgresAdapter {
+  return new PostgresAdapter(connectionString, schema);
 }

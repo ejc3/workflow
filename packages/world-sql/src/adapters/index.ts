@@ -12,11 +12,11 @@ export { SQLiteAdapter, createSQLiteAdapter } from './sqlite.js';
 /**
  * Create a database adapter based on the database type
  */
-export async function createAdapter(
+export function createAdapter(
   databaseType: DatabaseType,
   connectionString: string,
   schema?: Record<string, any>
-): Promise<DatabaseAdapter> {
+): DatabaseAdapter {
   switch (databaseType) {
     case 'postgres':
       return createPostgresAdapter(connectionString, schema);

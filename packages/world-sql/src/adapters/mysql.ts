@@ -1,43 +1,40 @@
 import { drizzle as drizzleMysql } from 'drizzle-orm/mysql2';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import type * as mysql from 'mysql2/promise';
+import mysql from 'mysql2';
+import type * as mysqlTypes from 'mysql2';
 import type { DatabaseAdapter } from './base.js';
 
 /**
- * MySQL adapter using mysql2
+ * MySQL adapter using mysql2 pool (synchronous setup like postgres)
  */
 export class MySQLAdapter
-  implements DatabaseAdapter<mysql.Connection, MySql2Database<any>>
+  implements DatabaseAdapter<mysqlTypes.Pool, MySql2Database<any>>
 {
   type = 'mysql' as const;
-  client: mysql.Connection;
+  client: mysqlTypes.Pool;
   drizzle: MySql2Database<any>;
 
-  private constructor(client: mysql.Connection, schema?: Record<string, any>) {
-    this.client = client;
-    this.drizzle = drizzleMysql(client, { schema, mode: 'default' });
-  }
-
-  static async create(
-    connectionString: string,
-    schema?: Record<string, any>
-  ): Promise<MySQLAdapter> {
-    const mysql2 = await import('mysql2/promise');
-    const client = await mysql2.default.createConnection(connectionString);
-    return new MySQLAdapter(client, schema);
+  constructor(connectionString: string, schema?: Record<string, any>) {
+    // Create pool synchronously (connects lazily like postgres)
+    this.client = mysql.createPool(connectionString);
+    this.drizzle = drizzleMysql(this.client, {
+      schema,
+      mode: 'default',
+    });
   }
 
   async connect(): Promise<void> {
-    await this.client.ping();
+    // Test connection
+    await this.client.promise().query('SELECT 1');
   }
 
   async disconnect(): Promise<void> {
-    await this.client.end();
+    await this.client.promise().end();
   }
 
   async isHealthy(): Promise<boolean> {
     try {
-      await this.client.ping();
+      await this.client.promise().query('SELECT 1');
       return true;
     } catch {
       return false;
@@ -48,9 +45,9 @@ export class MySQLAdapter
 /**
  * Create a MySQL adapter
  */
-export async function createMySQLAdapter(
+export function createMySQLAdapter(
   connectionString: string,
   schema?: Record<string, any>
-): Promise<MySQLAdapter> {
-  return MySQLAdapter.create(connectionString, schema);
+): MySQLAdapter {
+  return new MySQLAdapter(connectionString, schema);
 }

@@ -4,7 +4,7 @@ import type { StreamingAdapter } from './base.js';
 import { createPostgresStreaming } from './postgres-streaming.js';
 import { createPollingStreaming } from './polling-streaming.js';
 
-export { StreamingAdapter } from './base.js';
+export type { StreamingAdapter } from './base.js';
 
 /**
  * Create a streaming adapter based on the database type

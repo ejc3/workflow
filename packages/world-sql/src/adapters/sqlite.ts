@@ -6,10 +6,12 @@ import type { DatabaseAdapter } from './base.js';
 /**
  * SQLite adapter using better-sqlite3
  */
-export class SQLiteAdapter implements DatabaseAdapter<BetterSqlite3.Database, BetterSQLite3Database> {
+export class SQLiteAdapter
+  implements DatabaseAdapter<BetterSqlite3.Database, BetterSQLite3Database<any>>
+{
   type = 'sqlite' as const;
   client: BetterSqlite3.Database;
-  drizzle: BetterSQLite3Database;
+  drizzle: BetterSQLite3Database<any>;
 
   constructor(connectionString: string, schema?: Record<string, any>) {
     const Database = require('better-sqlite3');

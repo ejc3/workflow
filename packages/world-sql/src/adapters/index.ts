@@ -4,7 +4,7 @@ import { createMySQLAdapter } from './mysql.js';
 import { createPostgresAdapter } from './postgres.js';
 import { createSQLiteAdapter } from './sqlite.js';
 
-export { DatabaseAdapter } from './base.js';
+export type { DatabaseAdapter } from './base.js';
 export { PostgresAdapter, createPostgresAdapter } from './postgres.js';
 export { MySQLAdapter, createMySQLAdapter } from './mysql.js';
 export { SQLiteAdapter, createSQLiteAdapter } from './sqlite.js';

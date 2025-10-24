@@ -10,6 +10,7 @@ import { and, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
 import type { DatabaseAdapter } from './adapters/index.js';
 import type { DatabaseType } from './config.js';
+import { compact } from './util.js';
 
 export type SerializedContent = any[];
 

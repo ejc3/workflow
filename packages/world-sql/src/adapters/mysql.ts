@@ -6,17 +6,22 @@ import type { DatabaseAdapter } from './base.js';
 /**
  * MySQL adapter using mysql2
  */
-export class MySQLAdapter implements DatabaseAdapter<mysql.Connection, MySql2Database> {
+export class MySQLAdapter
+  implements DatabaseAdapter<mysql.Connection, MySql2Database<any>>
+{
   type = 'mysql' as const;
   client: mysql.Connection;
-  drizzle: MySql2Database;
+  drizzle: MySql2Database<any>;
 
   private constructor(client: mysql.Connection, schema?: Record<string, any>) {
     this.client = client;
     this.drizzle = drizzleMysql(client, { schema, mode: 'default' });
   }
 
-  static async create(connectionString: string, schema?: Record<string, any>): Promise<MySQLAdapter> {
+  static async create(
+    connectionString: string,
+    schema?: Record<string, any>
+  ): Promise<MySQLAdapter> {
     const mysql2 = require('mysql2/promise');
     const client = await mysql2.createConnection(connectionString);
     return new MySQLAdapter(client, schema);

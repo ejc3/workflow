@@ -6,10 +6,12 @@ import type { DatabaseAdapter } from './base.js';
 /**
  * PostgreSQL adapter using postgres.js
  */
-export class PostgresAdapter implements DatabaseAdapter<Postgres.Sql, PostgresJsDatabase> {
+export class PostgresAdapter
+  implements DatabaseAdapter<Postgres.Sql, PostgresJsDatabase<any>>
+{
   type = 'postgres' as const;
   client: Postgres.Sql;
-  drizzle: PostgresJsDatabase;
+  drizzle: PostgresJsDatabase<any>;
 
   constructor(connectionString: string, schema?: Record<string, any>) {
     // Dynamic import is handled by the factory

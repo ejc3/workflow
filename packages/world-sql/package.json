@@ -1,7 +1,7 @@
 {
-  "name": "@workflow/world-postgres",
+  "name": "@workflow/world-sql",
   "version": "4.0.1-beta.1",
-  "description": "A reference World implementation based on PostgreSQL",
+  "description": "A reference World implementation supporting PostgreSQL, MySQL, and SQLite",
   "type": "module",
   "main": "dist/index.js",
   "files": [
@@ -14,7 +14,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/vercel/workflow.git",
-    "directory": "packages/world-postgres"
+    "directory": "packages/world-sql"
   },
   "exports": {
     ".": {
@@ -36,18 +36,41 @@
     "@workflow/world": "workspace:*",
     "@workflow/world-local": "workspace:*",
     "drizzle-orm": "^0.31.2",
-    "pg-boss": "^11.0.7",
-    "postgres": "^3.4.7",
     "ulid": "^3.0.1",
     "zod": "catalog:"
   },
+  "peerDependencies": {
+    "postgres": "^3.4.7",
+    "pg-boss": "^11.0.7",
+    "mysql2": "^3.0.0",
+    "better-sqlite3": "^11.0.0"
+  },
+  "peerDependenciesMeta": {
+    "postgres": {
+      "optional": true
+    },
+    "pg-boss": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@testcontainers/postgresql": "^11.7.1",
+    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "catalog:",
     "@workflow/errors": "workspace:*",
     "@workflow/tsconfig": "workspace:*",
     "@workflow/world-testing": "workspace:*",
+    "better-sqlite3": "^11.0.0",
     "drizzle-kit": "^0.22.7",
+    "mysql2": "^3.0.0",
+    "pg-boss": "^11.0.7",
+    "postgres": "^3.4.7",
     "vitest": "catalog:"
   },
   "keywords": [],

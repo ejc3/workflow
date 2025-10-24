@@ -8,23 +8,27 @@ import type {
 } from '@workflow/world';
 import { and, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
-import { type Drizzle, Schema } from './drizzle/index.js';
-import type { SerializedContent } from './drizzle/schema.js';
-import { compact } from './util.js';
+import type { DatabaseAdapter } from './adapters/index.js';
+import type { DatabaseType } from './config.js';
 
-export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
+export type SerializedContent = any[];
+
+export function createRunsStorage(
+  adapter: DatabaseAdapter,
+  schema: any
+): Storage['runs'] {
   const ulid = monotonicFactory();
-  const { runs } = Schema;
-  const get = drizzle
-    .select()
-    .from(runs)
-    .where(eq(runs.runId, sql.placeholder('id')))
-    .limit(1)
-    .prepare('workflow_runs_get');
+  const { runs } = schema;
+  const drizzle = adapter.drizzle;
+  const dbType = adapter.type;
 
   return {
     async get(id) {
-      const [value] = await get.execute({ id });
+      const [value] = await drizzle
+        .select()
+        .from(runs)
+        .where(eq(runs.runId, id))
+        .limit(1);
       if (!value) {
         throw new WorkflowAPIError(`Run not found: ${id}`, { status: 404 });
       }
@@ -33,8 +37,8 @@ export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
     async cancel(id) {
       // TODO: we might want to guard this for only specific statuses
       const [value] = await drizzle
-        .update(Schema.runs)
-        .set({ status: 'cancelled', completedAt: sql`now()` })
+        .update(runs)
+        .set({ status: 'cancelled', completedAt: new Date() })
         .where(eq(runs.runId, id))
         .returning();
       if (!value) {
@@ -45,7 +49,7 @@ export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
     async pause(id) {
       // TODO: we might want to guard this for only specific statuses
       const [value] = await drizzle
-        .update(Schema.runs)
+        .update(runs)
         .set({ status: 'paused' })
         .where(eq(runs.runId, id))
         .returning();
@@ -56,7 +60,7 @@ export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
     },
     async resume(id) {
       const [value] = await drizzle
-        .update(Schema.runs)
+        .update(runs)
         .set({ status: 'running' })
         .where(and(eq(runs.runId, id), eq(runs.status, 'paused')))
         .returning();
@@ -162,9 +166,13 @@ function map<T, R>(obj: T | null | undefined, fn: (v: T) => R): undefined | R {
   return obj ? fn(obj) : undefined;
 }
 
-export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
+export function createEventsStorage(
+  adapter: DatabaseAdapter,
+  schema: any
+): Storage['events'] {
   const ulid = monotonicFactory();
-  const { events } = Schema;
+  const { events } = schema;
+  const drizzle = adapter.drizzle;
 
   return {
     async create(runId, data) {
@@ -247,14 +255,12 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
   };
 }
 
-export function createHooksStorage(drizzle: Drizzle): Storage['hooks'] {
-  const { hooks } = Schema;
-  const getByToken = drizzle
-    .select()
-    .from(hooks)
-    .where(eq(hooks.token, sql.placeholder('token')))
-    .limit(1)
-    .prepare('workflow_hooks_get_by_token');
+export function createHooksStorage(
+  adapter: DatabaseAdapter,
+  schema: any
+): Storage['hooks'] {
+  const { hooks } = schema;
+  const drizzle = adapter.drizzle;
 
   return {
     async get(hookId) {
@@ -286,7 +292,11 @@ export function createHooksStorage(drizzle: Drizzle): Storage['hooks'] {
       return compact(value);
     },
     async getByToken(token) {
-      const [value] = await getByToken.execute({ token });
+      const [value] = await drizzle
+        .select()
+        .from(hooks)
+        .where(eq(hooks.token, token))
+        .limit(1);
       if (!value) {
         throw new WorkflowAPIError(`Hook not found for token: ${token}`, {
           status: 404,
@@ -331,19 +341,12 @@ export function createHooksStorage(drizzle: Drizzle): Storage['hooks'] {
   };
 }
 
-export function createStepsStorage(drizzle: Drizzle): Storage['steps'] {
-  const { steps } = Schema;
-  const get = drizzle
-    .select()
-    .from(steps)
-    .where(
-      and(
-        eq(steps.stepId, sql.placeholder('stepId')),
-        eq(steps.runId, sql.placeholder('runId'))
-      )
-    )
-    .limit(1)
-    .prepare('workflow_steps_get');
+export function createStepsStorage(
+  adapter: DatabaseAdapter,
+  schema: any
+): Storage['steps'] {
+  const { steps } = schema;
+  const drizzle = adapter.drizzle;
 
   return {
     async create(runId, data) {
@@ -367,7 +370,11 @@ export function createStepsStorage(drizzle: Drizzle): Storage['steps'] {
       return compact(value);
     },
     async get(runId, stepId) {
-      const [value] = await get.execute({ stepId, runId });
+      const [value] = await drizzle
+        .select()
+        .from(steps)
+        .where(and(eq(steps.stepId, stepId), eq(steps.runId, runId)))
+        .limit(1);
       if (!value) {
         throw new WorkflowAPIError(`Step not found: ${stepId}`, {
           status: 404,

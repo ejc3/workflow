@@ -1,0 +1,79 @@
+name: Build MySQL Docker Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/mysql/**'
+      - 'packages/world-sql/schema-mysql.sql'
+      - '.github/workflows/build-mysql-image.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docker/mysql/**'
+      - 'packages/world-sql/schema-mysql.sql'
+      - '.github/workflows/build-mysql-image.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-push-mysql:
+    name: Build and Push MySQL Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags
+        id: tags
+        run: |
+          IMAGE_BASE="ghcr.io/${{ github.repository_owner }}/workflow-mysql"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR build: tag with pr-<number>
+            TAG="pr-${{ github.event.pull_request.number }}"
+            echo "tags=${IMAGE_BASE}:${TAG}" >> $GITHUB_OUTPUT
+            echo "Building PR image: ${IMAGE_BASE}:${TAG}"
+          else
+            # Main build: tag with commit SHA and latest
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            echo "tags=${IMAGE_BASE}:${SHORT_SHA},${IMAGE_BASE}:latest" >> $GITHUB_OUTPUT
+            echo "Building main image: ${IMAGE_BASE}:${SHORT_SHA} and ${IMAGE_BASE}:latest"
+          fi
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/mysql
+          file: ./docker/mysql/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image summary
+        run: |
+          echo "✓ Built and pushed workflow-mysql image"
+          echo "Tags: ${{ steps.tags.outputs.tags }}"
+          echo ""
+          echo "To use this image:"
+          echo "  docker pull ${{ steps.tags.outputs.tags }}"
+          echo "  docker run -d --name workflow-mysql \\"
+          echo "    -e MYSQL_ROOT_PASSWORD=root \\"
+          echo "    -e MYSQL_PASSWORD=workflow \\"
+          echo "    -p 3306:3306 \\"
+          echo "    ${{ steps.tags.outputs.tags }}"

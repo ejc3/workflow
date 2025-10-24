@@ -25,7 +25,7 @@ export function createQueueAdapter(
     }
     case 'mysql':
     case 'sqlite':
-      return createTableQueue(adapter, schema, config);
+      return createTableQueue(databaseType, adapter, schema, config);
     default:
       throw new Error(`Unsupported database type: ${databaseType as string}`);
   }

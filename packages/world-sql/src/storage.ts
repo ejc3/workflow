@@ -49,6 +49,50 @@ async function updateAndReturn<T>(
   }
 }
 
+/**
+ * Helper to insert a row and return the inserted value
+ * MySQL doesn't support RETURNING, so we need to SELECT after INSERT
+ */
+async function insertAndReturn<T>(
+  dbType: DatabaseType,
+  drizzle: any,
+  table: any,
+  values: Record<string, any>,
+  primaryKeyColumn: any,
+  primaryKeyValue: string,
+  onConflict?: 'doNothing' | 'doUpdate'
+): Promise<T[]> {
+  if (dbType === 'mysql') {
+    try {
+      await drizzle.insert(table).values(values);
+    } catch (error: any) {
+      // MySQL duplicate entry error code is 1062
+      if (onConflict === 'doNothing' && error.errno === 1062) {
+        // Duplicate key - this is expected, just fetch the existing row
+      } else {
+        // Other error - re-throw
+        throw error;
+      }
+    }
+
+    // SELECT using the primary key to get the inserted/existing row
+    return drizzle
+      .select()
+      .from(table)
+      .where(eq(primaryKeyColumn, primaryKeyValue))
+      .limit(1);
+  } else {
+    // SQLite supports RETURNING
+    let insertQuery = drizzle.insert(table).values(values);
+
+    if (onConflict === 'doNothing') {
+      insertQuery = insertQuery.onConflictDoNothing();
+    }
+
+    return insertQuery.returning();
+  }
+}
+
 export function createRunsStorage(
   adapter: DatabaseAdapter,
   schema: any,
@@ -160,9 +204,14 @@ export function createRunsStorage(
             status: 409,
           });
         }
+      }
 
-        // Insert the new run (MySQL doesn't support RETURNING)
-        await drizzle.insert(runs).values({
+      // Insert the new run
+      const [value] = await insertAndReturn(
+        dbType,
+        drizzle,
+        runs,
+        {
           runId,
           input: data.input,
           executionContext: data.executionContext as Record<
@@ -172,41 +221,18 @@ export function createRunsStorage(
           deploymentId: data.deploymentId,
           status: 'pending',
           workflowName: data.workflowName,
+        },
+        runs.runId,
+        runId,
+        dbType === 'mysql' ? undefined : 'doNothing'
+      );
+
+      if (!value) {
+        throw new WorkflowAPIError(`Run ${runId} already exists`, {
+          status: 409,
         });
-
-        // Fetch the newly created run
-        const [value] = await drizzle
-          .select()
-          .from(runs)
-          .where(eq(runs.runId, runId))
-          .limit(1);
-
-        return compact(value) as any;
-      } else {
-        // PostgreSQL/SQLite: Use onConflictDoNothing
-        const [value] = await drizzle
-          .insert(runs)
-          .values({
-            runId,
-            input: data.input,
-            executionContext: data.executionContext as Record<
-              string,
-              unknown
-            > | null,
-            deploymentId: data.deploymentId,
-            status: 'pending',
-            workflowName: data.workflowName,
-          })
-          .onConflictDoNothing()
-          .returning();
-
-        if (!value) {
-          throw new WorkflowAPIError(`Run ${runId} already exists`, {
-            status: 409,
-          });
-        }
-        return compact(value) as any;
       }
+      return compact(value) as any;
     },
     async update(id, data) {
       // Fetch current run to check if startedAt is already set
@@ -260,7 +286,8 @@ function map<T, R>(obj: T | null | undefined, fn: (v: T) => R): undefined | R {
 
 export function createEventsStorage(
   adapter: DatabaseAdapter,
-  schema: any
+  schema: any,
+  dbType: DatabaseType
 ): Storage['events'] {
   const ulid = monotonicFactory();
   const { events } = schema;
@@ -269,16 +296,39 @@ export function createEventsStorage(
   return {
     async create(runId, data) {
       const eventId = `wevt_${ulid()}`;
-      const [value] = await drizzle
-        .insert(events)
-        .values({
+
+      let value;
+      if (dbType === 'mysql') {
+        // MySQL: INSERT then SELECT
+        await drizzle.insert(events).values({
           runId,
           eventId,
           correlationId: data.correlationId,
           eventType: data.eventType,
           eventData: 'eventData' in data ? data.eventData : undefined,
-        })
-        .returning({ createdAt: events.createdAt });
+        });
+
+        const [result] = await drizzle
+          .select({ createdAt: events.createdAt })
+          .from(events)
+          .where(eq(events.eventId, eventId))
+          .limit(1);
+        value = result;
+      } else {
+        // SQLite/PostgreSQL: use RETURNING
+        const [result] = await drizzle
+          .insert(events)
+          .values({
+            runId,
+            eventId,
+            correlationId: data.correlationId,
+            eventType: data.eventType,
+            eventData: 'eventData' in data ? data.eventData : undefined,
+          })
+          .returning({ createdAt: events.createdAt });
+        value = result;
+      }
+
       if (!value) {
         throw new WorkflowAPIError(`Event ${eventId} could not be created`, {
           status: 409,
@@ -349,7 +399,8 @@ export function createEventsStorage(
 
 export function createHooksStorage(
   adapter: DatabaseAdapter,
-  schema: any
+  schema: any,
+  dbType: DatabaseType
 ): Storage['hooks'] {
   const { hooks } = schema;
   const drizzle = adapter.drizzle;
@@ -364,18 +415,22 @@ export function createHooksStorage(
       return compact(value) as any;
     },
     async create(runId, data) {
-      const [value] = await drizzle
-        .insert(hooks)
-        .values({
+      const [value] = await insertAndReturn(
+        dbType,
+        drizzle,
+        hooks,
+        {
           runId,
           hookId: data.hookId,
           token: data.token,
           ownerId: '', // TODO: get from context
           projectId: '', // TODO: get from context
           environment: '', // TODO: get from context
-        })
-        .onConflictDoNothing()
-        .returning();
+        },
+        hooks.hookId,
+        data.hookId,
+        'doNothing'
+      );
       if (!value) {
         throw new WorkflowAPIError(`Hook ${data.hookId} already exists`, {
           status: 409,
@@ -419,14 +474,33 @@ export function createHooksStorage(
       };
     },
     async dispose(hookId) {
-      const [value] = await drizzle
-        .delete(hooks)
-        .where(eq(hooks.hookId, hookId))
-        .returning();
-      if (!value) {
-        throw new WorkflowAPIError(`Hook not found: ${hookId}`, {
-          status: 404,
-        });
+      let value;
+      if (dbType === 'mysql') {
+        // MySQL: SELECT before DELETE
+        const [existing] = await drizzle
+          .select()
+          .from(hooks)
+          .where(eq(hooks.hookId, hookId))
+          .limit(1);
+        if (!existing) {
+          throw new WorkflowAPIError(`Hook not found: ${hookId}`, {
+            status: 404,
+          });
+        }
+        await drizzle.delete(hooks).where(eq(hooks.hookId, hookId));
+        value = existing;
+      } else {
+        // SQLite supports DELETE...RETURNING
+        const [deleted] = await drizzle
+          .delete(hooks)
+          .where(eq(hooks.hookId, hookId))
+          .returning();
+        if (!deleted) {
+          throw new WorkflowAPIError(`Hook not found: ${hookId}`, {
+            status: 404,
+          });
+        }
+        value = deleted;
       }
       return compact(value) as any;
     },
@@ -443,60 +517,30 @@ export function createStepsStorage(
 
   return {
     async create(runId, data) {
-      if (dbType === 'mysql') {
-        // MySQL: Check if step exists first
-        const [existing] = await drizzle
-          .select()
-          .from(steps)
-          .where(eq(steps.stepId, data.stepId))
-          .limit(1);
-
-        if (existing) {
-          throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
-            status: 409,
-          });
-        }
-
-        // Insert the step
-        await drizzle.insert(steps).values({
+      // Insert the step - use INSERT IGNORE to handle duplicates gracefully
+      const [value] = await insertAndReturn(
+        dbType,
+        drizzle,
+        steps,
+        {
           runId,
           stepId: data.stepId,
           stepName: data.stepName,
           input: data.input as SerializedContent,
           status: 'pending',
           attempt: 1,
+        },
+        steps.stepId,
+        data.stepId,
+        'doNothing'
+      );
+
+      if (!value) {
+        throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
+          status: 409,
         });
-
-        // Fetch the newly created step
-        const [value] = await drizzle
-          .select()
-          .from(steps)
-          .where(eq(steps.stepId, data.stepId))
-          .limit(1);
-
-        return compact(value) as any;
-      } else {
-        // PostgreSQL/SQLite: Use onConflictDoNothing
-        const [value] = await drizzle
-          .insert(steps)
-          .values({
-            runId,
-            stepId: data.stepId,
-            stepName: data.stepName,
-            input: data.input as SerializedContent,
-            status: 'pending',
-            attempt: 1,
-          })
-          .onConflictDoNothing()
-          .returning();
-
-        if (!value) {
-          throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
-            status: 409,
-          });
-        }
-        return compact(value) as any;
       }
+      return compact(value) as any;
     },
     async get(runId, stepId) {
       const [value] = await drizzle

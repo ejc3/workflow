@@ -42,8 +42,8 @@ function createStorage(
 ): Storage {
   return {
     runs: createRunsStorage(adapter, schema, dbType),
-    events: createEventsStorage(adapter, schema),
-    hooks: createHooksStorage(adapter, schema),
+    events: createEventsStorage(adapter, schema, dbType),
+    hooks: createHooksStorage(adapter, schema, dbType),
     steps: createStepsStorage(adapter, schema, dbType),
   };
 }

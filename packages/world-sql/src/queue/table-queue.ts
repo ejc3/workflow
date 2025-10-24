@@ -9,6 +9,7 @@ import {
 import { createEmbeddedWorld } from '@workflow/world-local';
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { monotonicFactory } from 'ulid';
+import type { DatabaseType } from '../config.js';
 import type { DatabaseAdapter } from '../adapters/index.js';
 import { MessageData } from '../boss.js';
 import type { QueueAdapter, QueueAdapterConfig } from './base.js';
@@ -17,6 +18,7 @@ import type { QueueAdapter, QueueAdapterConfig } from './base.js';
  * Table-based queue adapter for MySQL and SQLite using polling
  */
 export function createTableQueue(
+  dbType: DatabaseType,
   adapter: DatabaseAdapter,
   schema: any,
   config: QueueAdapterConfig
@@ -92,21 +94,56 @@ export function createTableQueue(
     const lockUntil = new Date(now.getTime() + lockDuration);
 
     // Try to lock the job
-    const [locked] = await drizzle
-      .update(jobs)
-      .set({
-        status: 'processing',
-        lockedUntil: lockUntil,
-        attempts: job.attempts + 1,
-      })
-      .where(
-        and(
-          eq(jobs.id, job.id),
-          eq(jobs.status, 'pending'),
-          or(isNull(jobs.lockedUntil), lte(jobs.lockedUntil, now))
+    let locked;
+    if (dbType === 'mysql') {
+      // MySQL doesn't support RETURNING, so UPDATE then SELECT
+      const result = await drizzle
+        .update(jobs)
+        .set({
+          status: 'processing',
+          lockedUntil: lockUntil,
+          attempts: job.attempts + 1,
+        })
+        .where(
+          and(
+            eq(jobs.id, job.id),
+            eq(jobs.status, 'pending'),
+            or(isNull(jobs.lockedUntil), lte(jobs.lockedUntil, now))
+          )
+        );
+
+      // Check if update succeeded (affected rows > 0)
+      if ((result as any).rowsAffected === 0) {
+        // Job was locked by another worker
+        return;
+      }
+
+      // SELECT the locked job
+      const [lockedJob] = await drizzle
+        .select()
+        .from(jobs)
+        .where(eq(jobs.id, job.id))
+        .limit(1);
+      locked = lockedJob;
+    } else {
+      // SQLite supports RETURNING
+      const [lockedJob] = await drizzle
+        .update(jobs)
+        .set({
+          status: 'processing',
+          lockedUntil: lockUntil,
+          attempts: job.attempts + 1,
+        })
+        .where(
+          and(
+            eq(jobs.id, job.id),
+            eq(jobs.status, 'pending'),
+            or(isNull(jobs.lockedUntil), lte(jobs.lockedUntil, now))
+          )
         )
-      )
-      .returning();
+        .returning();
+      locked = lockedJob;
+    }
 
     if (!locked) {
       // Job was locked by another worker

@@ -16,6 +16,7 @@
     "@vercel/otel": "^1.13.0",
     "workflow": "workspace:*",
     "@workflow/ai": "workspace:*",
+    "@workflow/world-sql": "workspace:*",
     "ai": "catalog:",
     "lodash.chunk": "^4.2.0",
     "next": "15.5.3",

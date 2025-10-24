@@ -20,7 +20,8 @@ type Workflows<F extends Files> = keyof (typeof manifest.workflows)[F];
 
 export const Worlds = {
   embedded: 'embedded',
-  postgres: '@workflow/world-postgres',
+  postgres: '@workflow/world-sql', // Renamed from world-postgres
+  sql: '@workflow/world-sql',
 };
 
 export async function startServer(opts: { world: string }) {

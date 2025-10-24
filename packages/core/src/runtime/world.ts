@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import Path from 'node:path';
 import type { World } from '@workflow/world';
 import { createEmbeddedWorld } from '@workflow/world-local';
+import { createWorld as createSqlWorld } from '@workflow/world-sql';
 import { createVercelWorld } from '@workflow/world-vercel';
 
 const require = createRequire(Path.join(process.cwd(), 'index.js'));
@@ -42,6 +43,23 @@ export const createWorld = (): World => {
       dataDir: process.env.WORKFLOW_EMBEDDED_DATA_DIR,
       port: process.env.PORT ? Number(process.env.PORT) : undefined,
     });
+  }
+
+  if (targetWorld === '@workflow/world-sql') {
+    const world = createSqlWorld({
+      databaseType: process.env.WORKFLOW_SQL_DATABASE_TYPE as any,
+      connectionString: process.env.WORKFLOW_SQL_URL || '',
+      queueConcurrency: process.env.WORKFLOW_SQL_WORKER_CONCURRENCY
+        ? Number(process.env.WORKFLOW_SQL_WORKER_CONCURRENCY)
+        : undefined,
+    });
+    // Start the world asynchronously (queue worker, etc)
+    if ('start' in world && typeof world.start === 'function') {
+      world.start().catch((err) => {
+        console.error('Failed to start world-sql:', err);
+      });
+    }
+    return world;
   }
 
   const mod = require(targetWorld);

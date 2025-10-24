@@ -1,10 +1,10 @@
 ---
-title: Postgres World
+title: SQL World
 ---
 
 import { Callout } from '@/components/ui/callout';
 
-# Postgres World
+# SQL World
 
 <Callout type="wip">
 
@@ -20,29 +20,90 @@ This page is a work in progress.
 
 </Callout>
 
-The PostgreSQL world is a reference implementation of a [world](/docs/deploying/world) that's fully backed by PostgreSQL, including job processing (using [pg-boss](https://github.com/timgit/pg-boss)) and streaming (using PostgreSQL's NOTIFY and LISTEN).
+The SQL world is a reference implementation of a [world](/docs/deploying/world) that supports **PostgreSQL**, **MySQL**, and **SQLite**, including job processing and streaming.
 
-This world is designed for long-running processes, so it can receive and dispatch events from a PostgreSQL database, and isn't meant to be deployed on serverless platforms like Vercel due to that nature.
+- **PostgreSQL**: Uses [pg-boss](https://github.com/timgit/pg-boss) for queues and LISTEN/NOTIFY for streaming (real-time)
+- **MySQL/SQLite**: Uses table-based polling for queues and streaming (200ms intervals)
 
+This world is designed for long-running processes, so it can receive and dispatch events from a SQL database, and isn't meant to be deployed on serverless platforms like Vercel due to that nature.
+
+> **Note**: This package was formerly known as `@workflow/world-postgres`.
 
 ## Usage
 
-Install the package and set the world target using the following commands:
+Install the package and the appropriate database client:
 
 ```bash
 # Install the package
-$ npm install @workflow/world-postgres
+$ npm install @workflow/world-sql
+
+# For PostgreSQL
+$ npm install postgres pg-boss
+
+# For MySQL
+$ npm install mysql2
+
+# For SQLite
+$ npm install better-sqlite3
+
 # Set the world target environment variable
-$ export WORKFLOW_TARGET_WORLD="@workflow/world-postgres"
+$ export WORKFLOW_TARGET_WORLD="@workflow/world-sql"
 ```
 
 ## Configuration
 
-Configure the world using the following environments variables:
+Configure the world using the following environment variables:
 
-| Variable                               | Description                                                  | Default                                         |
-| -------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------- |
-| `WORKFLOW_POSTGRES_URL`                | PostgreSQL connection string                                 | `postgres://world:world@localhost:5432/world` |
-| `WORKFLOW_POSTGRES_JOB_PREFIX`         | Prefix for queue job names                                   | `workflow_`                                               |
-| `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` | Number of concurrent workers                                 | `10`                                            |
+**PostgreSQL:**
+```bash
+export WORKFLOW_SQL_DATABASE_TYPE="postgres"
+export WORKFLOW_SQL_URL="postgres://user:password@localhost:5432/database"
+export WORKFLOW_SQL_JOB_PREFIX="myapp"
+export WORKFLOW_SQL_WORKER_CONCURRENCY="10"
+```
 
+**MySQL:**
+```bash
+export WORKFLOW_SQL_DATABASE_TYPE="mysql"
+export WORKFLOW_SQL_URL="mysql://user:password@localhost:3306/database"
+export WORKFLOW_SQL_JOB_PREFIX="myapp"
+export WORKFLOW_SQL_WORKER_CONCURRENCY="10"
+```
+
+**SQLite:**
+```bash
+export WORKFLOW_SQL_DATABASE_TYPE="sqlite"
+export WORKFLOW_SQL_URL="/path/to/database.db"  # or ":memory:"
+export WORKFLOW_SQL_JOB_PREFIX="myapp"
+export WORKFLOW_SQL_WORKER_CONCURRENCY="10"
+```
+
+### Environment Variables
+
+| Variable                               | Description                                        | Default                                         |
+| -------------------------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| `WORKFLOW_SQL_DATABASE_TYPE`           | Database type: `postgres`, `mysql`, or `sqlite`    | Auto-detected from connection string            |
+| `WORKFLOW_SQL_URL`                     | Database connection string                         | (varies by database)                            |
+| `WORKFLOW_SQL_JOB_PREFIX`              | Prefix for queue job names                         | `workflow_`                                     |
+| `WORKFLOW_SQL_WORKER_CONCURRENCY`      | Number of concurrent workers                       | `10`                                            |
+
+**Backward Compatibility**: The old `WORKFLOW_POSTGRES_*` environment variables are still supported.
+
+## Performance
+
+### PostgreSQL
+- Real-time queue and streaming (LISTEN/NOTIFY)
+- Best for production workloads requiring low latency
+- Minimal overhead
+
+### MySQL
+- 200ms polling for queue and streaming
+- Good for most production workloads
+- Low overhead
+
+### SQLite
+- 200ms polling for queue and streaming
+- Good for development and single-process deployments
+- Not recommended for multi-process scenarios
+
+For more details, see the [package README](https://github.com/vercel/workflow/tree/main/packages/world-sql).

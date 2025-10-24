@@ -1,0 +1,49 @@
+import { drizzle as drizzlePg } from 'drizzle-orm/postgres-js';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import type Postgres from 'postgres';
+import type { DatabaseAdapter } from './base.js';
+
+/**
+ * PostgreSQL adapter using postgres.js
+ */
+export class PostgresAdapter
+  implements DatabaseAdapter<Postgres.Sql, PostgresJsDatabase<any>>
+{
+  type = 'postgres' as const;
+  client: Postgres.Sql;
+  drizzle: PostgresJsDatabase<any>;
+
+  constructor(connectionString: string, schema?: Record<string, any>) {
+    this.client = postgres(connectionString);
+    this.drizzle = drizzlePg(this.client, { schema });
+  }
+
+  async connect(): Promise<void> {
+    // postgres.js connects automatically on first query
+    await this.client`SELECT 1`;
+  }
+
+  async disconnect(): Promise<void> {
+    await this.client.end();
+  }
+
+  async isHealthy(): Promise<boolean> {
+    try {
+      await this.client`SELECT 1`;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Create a PostgreSQL adapter
+ */
+export function createPostgresAdapter(
+  connectionString: string,
+  schema?: Record<string, any>
+): PostgresAdapter {
+  return new PostgresAdapter(connectionString, schema);
+}

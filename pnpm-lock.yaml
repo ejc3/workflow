@@ -904,6 +904,9 @@ importers:
       '@workflow/ai':
         specifier: workspace:*
         version: link:../../packages/ai
+      '@workflow/world-sql':
+        specifier: workspace:*
+        version: link:../../packages/world-sql
       ai:
         specifier: 'catalog:'
         version: 5.0.76(zod@4.1.11)

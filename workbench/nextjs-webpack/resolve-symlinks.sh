@@ -6,8 +6,11 @@ set -e
 
 echo "Resolving all symlinks in current directory..."
 
-# Find all symlinks in current directory (including nested ones), excluding gitignored files
-git ls-files -z --cached --others --exclude-standard | xargs -0 -I {} sh -c 'test -L "{}" && echo "{}"' | while read -r symlink; do
+# Find all symlinks in current directory (including nested ones)
+# Excluding node_modules to avoid issues with pnpm symlinks
+find . -type l -not -path "*/node_modules/*" -not -path "*/.next/*" -not -path "*/.turbo/*" | while read -r symlink; do
+  # Remove leading ./
+  symlink="${symlink#./}"
   # Get the target of the symlink
   target=$(readlink "$symlink")
 

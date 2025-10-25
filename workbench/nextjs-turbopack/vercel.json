@@ -1,3 +1,3 @@
 {
-  "buildCommand": "./resolve-symlinks.sh && next build --turbopack"
+  "buildCommand": "bash resolve-symlinks.sh && next build --turbopack"
 }

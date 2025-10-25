@@ -1,0 +1,3 @@
+{
+  "buildCommand": "./resolve-symlinks.sh && nitro build"
+}

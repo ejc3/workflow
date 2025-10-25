@@ -16,7 +16,7 @@ export async function GET() {
     let runsHealthy = false;
     let runsError: string | undefined;
     try {
-      await world.runs.list({ limit: 1 });
+      await world.runs.list({ pagination: { limit: 1 } });
       runsHealthy = true;
     } catch (err) {
       runsError = err instanceof Error ? err.message : String(err);

@@ -2,14 +2,7 @@
 set -e
 
 # Script to recursively resolve all symlinks in the app directory
-# This is needed for CI and Vercel builds where symlinks don't work well
-
-# Only run in CI or Vercel build environments
-if [ -z "$CI" ] && [ -z "$VERCEL" ]; then
-  echo "Error: This script should only be run in CI or Vercel build environments"
-  echo "If you need to resolve symlinks locally, run it manually with CI=true"
-  exit 1
-fi
+# This is needed for Vercel builds where symlinks outside project root don't work
 
 echo "Resolving all symlinks in current directory..."
 

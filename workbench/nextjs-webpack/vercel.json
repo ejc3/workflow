@@ -1,3 +1,0 @@
-{
-  "buildCommand": "bash resolve-symlinks.sh && next build"
-}

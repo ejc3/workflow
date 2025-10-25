@@ -1,5 +1,14 @@
 # workflow
 
+## 4.0.1-beta.3
+
+### Patch Changes
+
+- 7dad974: README fixes
+  - @workflow/cli@4.0.1-beta.3
+  - @workflow/next@4.0.1-beta.3
+  - @workflow/nitro@4.0.1-beta.3
+
 ## 4.0.1-beta.2
 
 ### Patch Changes

@@ -386,9 +386,6 @@ importers:
       '@workflow/world-local':
         specifier: workspace:*
         version: link:../world-local
-      '@workflow/world-sql':
-        specifier: workspace:*
-        version: link:../world-sql
       '@workflow/world-vercel':
         specifier: workspace:*
         version: link:../world-vercel

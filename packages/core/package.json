@@ -52,7 +52,6 @@
     "@workflow/errors": "workspace:*",
     "@workflow/world": "workspace:*",
     "@workflow/world-local": "workspace:*",
-    "@workflow/world-sql": "workspace:*",
     "@workflow/world-vercel": "workspace:*",
     "debug": "^4.4.3",
     "devalue": "^5.4.1",

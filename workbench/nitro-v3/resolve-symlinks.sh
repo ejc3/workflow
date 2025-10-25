@@ -2,11 +2,11 @@
 set -e
 
 # Script to recursively resolve all symlinks in the app directory
-# This is needed for CI where Next.js dev mode doesn't work well with symlinks
+# This is needed for CI and Vercel builds where symlinks don't work well
 
-# Only run in CI
-if [ -z "$CI" ]; then
-  echo "Error: This script should only be run in CI environments"
+# Only run in CI or Vercel build environments
+if [ -z "$CI" ] && [ -z "$VERCEL" ]; then
+  echo "Error: This script should only be run in CI or Vercel build environments"
   echo "If you need to resolve symlinks locally, run it manually with CI=true"
   exit 1
 fi

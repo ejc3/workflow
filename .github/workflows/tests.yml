@@ -87,7 +87,7 @@ jobs:
         id: waitForDeployment
         uses: ./.github/actions/wait-for-vercel-project
         with:
-          team-id: "team_nO2mCG4W8IxPIeKoSsqwAxxB"
+          team-id: ${{ vars.VERCEL_TEAM_ID || 'team_nO2mCG4W8IxPIeKoSsqwAxxB' }}
           project-id: ${{ matrix.app.project-id }}
           vercel-token: ${{ secrets.VERCEL_LABS_TOKEN }}
           timeout: 1000
@@ -101,7 +101,7 @@ jobs:
           APP_NAME: ${{ matrix.app.name }}
           WORKFLOW_VERCEL_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
           WORKFLOW_VERCEL_AUTH_TOKEN: ${{ secrets.VERCEL_LABS_TOKEN }}
-          WORKFLOW_VERCEL_TEAM: "team_nO2mCG4W8IxPIeKoSsqwAxxB"
+          WORKFLOW_VERCEL_TEAM: ${{ vars.VERCEL_TEAM_ID || 'team_nO2mCG4W8IxPIeKoSsqwAxxB' }}
           WORKFLOW_VERCEL_PROJECT: ${{ matrix.app.project-id }}
 
   getTestMatrix:
@@ -169,7 +169,7 @@ jobs:
         run: pnpm turbo run build --filter='!./workbench/*'
 
       - name: Link to Vercel and Pull env
-        run: pnpm i -g vercel@latest && vc link --token=${{ secrets.VERCEL_LABS_TOKEN }} --project=${{ matrix.app.project }} --scope=vercel-labs -y && vc env pull --token=${{ secrets.VERCEL_LABS_TOKEN }} workbench/${{ matrix.app.name }}/.env.local
+        run: pnpm i -g vercel@latest && vc link --token=${{ secrets.VERCEL_LABS_TOKEN }} --project=${{ matrix.app.project }} --scope=${{ vars.VERCEL_SCOPE || 'vercel-labs' }} -y && vc env pull --token=${{ secrets.VERCEL_LABS_TOKEN }} workbench/${{ matrix.app.name }}/.env.local
 
       - name: Resolve symlinks for next dev to work
         if: matrix.app.name == 'nextjs-webpack'
@@ -230,7 +230,7 @@ jobs:
         run: pnpm turbo run build --filter='!./workbench/*'
 
       - name: Link to Vercel and Pull env
-        run: pnpm i -g vercel@latest && vc link --token=${{ secrets.VERCEL_LABS_TOKEN }} --project=${{ matrix.app.project }} --scope=vercel-labs -y && vc env pull --token=${{ secrets.VERCEL_LABS_TOKEN }} workbench/${{ matrix.app.name }}/.env.local
+        run: pnpm i -g vercel@latest && vc link --token=${{ secrets.VERCEL_LABS_TOKEN }} --project=${{ matrix.app.project }} --scope=${{ vars.VERCEL_SCOPE || 'vercel-labs' }} -y && vc env pull --token=${{ secrets.VERCEL_LABS_TOKEN }} workbench/${{ matrix.app.name }}/.env.local
 
       - name: Run Build Tests
         run: pnpm vitest run packages/core/e2e/local-build.test.ts

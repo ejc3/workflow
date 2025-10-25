@@ -38,8 +38,8 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Rebuild Native Modules
-        run: pnpm rebuild better-sqlite3
+      - name: Build better-sqlite3 Native Module
+        run: cd node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3 && npm run build-release
 
       - name: Run Unit Tests
         run: pnpm test

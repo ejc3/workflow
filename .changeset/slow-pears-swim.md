@@ -1,7 +1,6 @@
 ---
 "@workflow/swc-plugin": patch
 "@workflow/typescript-plugin": patch
-"@workflow/world-postgres": patch
 "@workflow/world-testing": patch
 "@workflow/world-vercel": patch
 "@workflow/world-local": patch

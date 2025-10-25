@@ -1,5 +1,12 @@
 # @workflow/web
 
+## 4.0.1-beta.3
+
+### Patch Changes
+
+- 22917ab: Web: fix resource detail sidebar briefly showing old data when updating selection
+- 9ba86ce: Web: fix links to docs
+
 ## 4.0.1-beta.2
 
 ### Patch Changes

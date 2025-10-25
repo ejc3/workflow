@@ -2,6 +2,7 @@
   "name": "@workflow/world-testing",
   "version": "4.0.1-beta.2",
   "description": "Testing utilities and World implementation for Workflow DevKit",
+  "type": "module",
   "main": "dist/src/index.mjs",
   "publishConfig": {
     "access": "public"

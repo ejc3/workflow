@@ -1,5 +1,11 @@
 # @workflow/next
 
+## 4.0.1-beta.3
+
+### Patch Changes
+
+- @workflow/cli@4.0.1-beta.3
+
 ## 4.0.1-beta.2
 
 ### Patch Changes

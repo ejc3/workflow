@@ -52,13 +52,13 @@ jobs:
       matrix:
         app:
           - name: "example"
-            project-id: "prj_xWq20Dd860HHAfzMjK2Mb6TPVxMa"
+            project-id: ${{ vars.VERCEL_PROJECT_EXAMPLE || 'prj_xWq20Dd860HHAfzMjK2Mb6TPVxMa' }}
           - name: "nextjs-turbopack"
-            project-id: "prj_yjkM7UdHliv8bfxZ1sMJQf1pMpdi"
+            project-id: ${{ vars.VERCEL_PROJECT_NEXTJS_TURBOPACK || 'prj_yjkM7UdHliv8bfxZ1sMJQf1pMpdi' }}
           - name: "nextjs-webpack"
-            project-id: "prj_avRPBF3eWjh6iDNQgmhH4VOg27h0"
+            project-id: ${{ vars.VERCEL_PROJECT_NEXTJS_WEBPACK || 'prj_avRPBF3eWjh6iDNQgmhH4VOg27h0' }}
           - name: "nitro"
-            project-id: "prj_e7DZirYdLrQKXNrlxg7KmA6ABx8r"
+            project-id: ${{ vars.VERCEL_PROJECT_NITRO || 'prj_e7DZirYdLrQKXNrlxg7KmA6ABx8r' }}
     env:
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       TURBO_TEAM: ${{ vars.TURBO_TEAM }}

@@ -32,21 +32,37 @@ describe('MySQL E2E - Working Example', () => {
     process.env.WORKFLOW_SQL_DATABASE_TYPE = 'mysql';
     process.env.WORKFLOW_SQL_URL = connectionString;
 
-    // Step 3: Push schema using drizzle-kit
-    execSync('pnpm db:push', {
-      stdio: 'inherit',
-      cwd: process.cwd(),
-      env: process.env,
-    });
+    // Step 3: Wait for MySQL to be fully ready
+    console.log('Waiting for MySQL to be fully ready...');
+    let retries = 30;
+    while (retries > 0) {
+      try {
+        execSync('pnpm db:push', {
+          stdio: 'inherit',
+          cwd: process.cwd(),
+          env: process.env,
+        });
+        console.log('MySQL is ready and schema pushed');
+        break;
+      } catch (error) {
+        retries--;
+        if (retries === 0) throw error;
+        console.log(`MySQL not ready, retrying... (${retries} attempts left)`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
 
-    // Step 3: Create world instance
+    // Step 4: Create world instance
     world = await createWorld({
       databaseType: 'mysql',
       connectionString,
     });
 
-    // Step 4: Start the queue
+    // Step 5: Start the queue
     await world.start();
+
+    // Step 6: Give queue a moment to initialize
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }, 120_000); // 2 minute timeout for container startup
 
   afterAll(async () => {
